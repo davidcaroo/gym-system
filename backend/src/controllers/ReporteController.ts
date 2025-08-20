@@ -390,4 +390,35 @@ Producto,Cantidad,Ingresos`;
     
     return csv;
   }
+
+  // Actividad reciente - Últimos eventos del sistema
+  getActividadReciente = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { limite } = req.query;
+      
+      // Validar límite
+      const limiteNum = limite ? parseInt(limite as string) : 10;
+      if (limiteNum < 1 || limiteNum > 50) {
+        res.status(400).json({
+          success: false,
+          message: 'El límite debe estar entre 1 y 50'
+        });
+        return;
+      }
+
+      const actividad = await this.reporteModel.getActividadReciente(limiteNum);
+
+      res.json({
+        success: true,
+        data: actividad,
+        message: 'Actividad reciente obtenida exitosamente'
+      });
+    } catch (error) {
+      logger.error('Error en getActividadReciente:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error interno del servidor'
+      });
+    }
+  };
 }

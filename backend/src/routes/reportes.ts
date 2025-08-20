@@ -11,6 +11,9 @@ router.use(requireAuth);
 // Dashboard ejecutivo (KPIs principales)
 router.get('/dashboard', reporteController.getDashboardKPIs);
 
+// Actividad reciente del sistema
+router.get('/actividad-reciente', reporteController.getActividadReciente);
+
 // Reportes específicos
 router.get('/financiero', reporteController.getReporteFinanciero);
 router.get('/miembros', reporteController.getAnalyticsMiembros);

@@ -101,6 +101,7 @@ export const API_ENDPOINTS = {
   // Reports
   REPORTS: {
     DASHBOARD: '/api/reportes/dashboard',
+    ACTIVITY_RECENT: '/api/reportes/actividad-reciente',
     FINANCIAL: '/api/reportes/financiero',
     MEMBERS: '/api/reportes/miembros',
     USAGE: '/api/reportes/uso',

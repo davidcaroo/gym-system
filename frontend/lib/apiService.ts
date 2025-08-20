@@ -26,6 +26,10 @@ import type {
   AccessReport,
   InventoryReport,
   FinancialReport,
+  IngresosChart,
+  ActividadReciente,
+  AlertaSistema,
+  ProductoStockBajo,
 } from './types';
 import { withErrorHandling } from './errorHandler';
 
@@ -481,6 +485,46 @@ export const reportsService = {
   getDashboardStats: withErrorHandling(async (): Promise<DashboardStats> => {
     const response = await httpClient.get<ApiResponse<DashboardStats>>(
       API_ENDPOINTS.REPORTS.DASHBOARD
+    );
+    return extractData(response);
+  }),
+
+  /**
+   * Obtener datos para gráfico de ingresos (últimos 7 días)
+   */
+  getIngresosChart: withErrorHandling(async (): Promise<IngresosChart[]> => {
+    const response = await httpClient.get<ApiResponse<IngresosChart[]>>(
+      `${API_ENDPOINTS.REPORTS.FINANCIAL}?tipo=ingresos_chart&dias=7`
+    );
+    return extractData(response);
+  }),
+
+  /**
+   * Obtener actividad reciente
+   */
+  getActividadReciente: withErrorHandling(async (limit: number = 10): Promise<ActividadReciente[]> => {
+    const response = await httpClient.get<ApiResponse<ActividadReciente[]>>(
+      `${API_ENDPOINTS.REPORTS.ACTIVITY_RECENT}?limite=${limit}`
+    );
+    return extractData(response);
+  }),
+
+  /**
+   * Obtener alertas del sistema
+   */
+  getAlertas: withErrorHandling(async (): Promise<AlertaSistema[]> => {
+    const response = await httpClient.get<ApiResponse<AlertaSistema[]>>(
+      `${API_ENDPOINTS.REPORTS.DASHBOARD}/alertas`
+    );
+    return extractData(response);
+  }),
+
+  /**
+   * Obtener productos con stock bajo
+   */
+  getProductosStockBajo: withErrorHandling(async (): Promise<ProductoStockBajo[]> => {
+    const response = await httpClient.get<ApiResponse<ProductoStockBajo[]>>(
+      API_ENDPOINTS.PRODUCTS.STOCK_LOW
     );
     return extractData(response);
   }),

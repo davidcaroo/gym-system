@@ -592,4 +592,93 @@ export class ReporteModel {
     
     return pagos.total + ventas.total;
   }
+
+  // ACTIVIDAD RECIENTE - Últimos 10 eventos del sistema
+  async getActividadReciente(limite: number = 10): Promise<any[]> {
+    try {
+      // Query para obtener diferentes tipos de actividad reciente
+      const actividadQuery = `
+        SELECT * FROM (
+          -- Ventas recientes
+          SELECT 
+            'venta' as tipo,
+            v.id,
+            'Venta de productos' as descripcion,
+            v.total as monto,
+            printf('$%,.0f', v.total) as monto_formateado,
+            v.fecha_venta as fecha,
+            strftime('%H:%M', v.fecha_venta) as hora,
+            COALESCE(m.nombre, 'Cliente general') as miembro_nombre
+          FROM ventas v
+          LEFT JOIN miembros m ON v.miembro_id = m.id
+          WHERE v.estado = 'completada'
+          
+          UNION ALL
+          
+          -- Pagos de membresías recientes
+          SELECT 
+            'pago' as tipo,
+            p.id,
+            'Pago de membresía' as descripcion,
+            p.monto as monto,
+            printf('$%,.0f', p.monto) as monto_formateado,
+            p.fecha_pago as fecha,
+            strftime('%H:%M', p.fecha_pago) as hora,
+            m.nombre as miembro_nombre
+          FROM pagos p
+          JOIN miembros m ON p.miembro_id = m.id
+          WHERE p.estado = 'pagado'
+          
+          UNION ALL
+          
+          -- Nuevos miembros registrados
+          SELECT 
+            'miembro' as tipo,
+            m.id,
+            'Nuevo miembro registrado' as descripcion,
+            NULL as monto,
+            NULL as monto_formateado,
+            m.fecha_registro as fecha,
+            strftime('%H:%M', m.fecha_registro) as hora,
+            m.nombre as miembro_nombre
+          FROM miembros m
+          WHERE m.estado = 'activo'
+          
+          UNION ALL
+          
+          -- Accesos recientes al gimnasio
+          SELECT 
+            'acceso' as tipo,
+            a.id,
+            'Acceso al gimnasio' as descripcion,
+            NULL as monto,
+            NULL as monto_formateado,
+            a.fecha_entrada as fecha,
+            strftime('%H:%M', a.fecha_entrada) as hora,
+            m.nombre as miembro_nombre
+          FROM accesos a
+          JOIN miembros m ON a.miembro_id = m.id
+        )
+        ORDER BY fecha DESC
+        LIMIT ?
+      `;
+
+      const actividades = this.db.prepare(actividadQuery).all(limite) as any[];
+
+      return actividades.map(actividad => ({
+        id: actividad.id,
+        tipo: actividad.tipo,
+        descripcion: actividad.descripcion,
+        monto: actividad.monto,
+        monto_formateado: actividad.monto_formateado,
+        fecha: actividad.fecha,
+        hora: actividad.hora,
+        miembro_nombre: actividad.miembro_nombre
+      }));
+
+    } catch (error) {
+      logger.error('Error al obtener actividad reciente:', error);
+      throw error;
+    }
+  }
 }

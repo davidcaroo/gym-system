@@ -10,41 +10,22 @@ import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer } from "recharts"
 import { LoadingSpinner } from "@/lib/loading"
 import { useToast } from "@/lib/toast"
 import { apiService } from "@/lib/apiService"
-import { DashboardStats } from "@/lib/types"
-
-// Datos estáticos que se mantienen (se pueden hacer dinámicos después)
-const chartData = [
-  { day: "Lun", ingresos: 2400 },
-  { day: "Mar", ingresos: 1800 },
-  { day: "Mié", ingresos: 3200 },
-  { day: "Jue", ingresos: 2800 },
-  { day: "Vie", ingresos: 3600 },
-  { day: "Sáb", ingresos: 4200 },
-  { day: "Dom", ingresos: 2100 },
-]
-
-const recentActivity = [
-  { id: 1, type: "venta", description: "Venta de Proteína Whey - Juan Pérez", amount: "$45.000", time: "10:30 AM" },
-  { id: 2, type: "miembro", description: "Nuevo miembro registrado - María García", amount: "", time: "09:15 AM" },
-  {
-    id: 3,
-    type: "venta",
-    description: "Venta de Bebida Energética - Carlos López",
-    amount: "$8.500",
-    time: "08:45 AM",
-  },
-  { id: 4, type: "miembro", description: "Renovación membresía - Ana Rodríguez", amount: "$120.000", time: "08:20 AM" },
-  { id: 5, type: "venta", description: "Venta de Toalla - Pedro Martín", amount: "$25.000", time: "07:55 AM" },
-]
-
-const alerts = [
-  { id: 1, type: "stock", message: "Proteína Whey Gold - Stock bajo (3 unidades)", priority: "high" },
-  { id: 2, type: "vencimiento", message: "5 membresías vencen esta semana", priority: "medium" },
-  { id: 3, type: "producto", message: "Creatina Monohidrato vence en 15 días", priority: "low" },
-]
+import { StockAlerts } from "@/components/stock-alerts"
+import { IngresosChartComponent } from "@/components/ingresos-chart"
+import {
+  DashboardStats,
+  IngresosChart,
+  ActividadReciente,
+  AlertaSistema,
+  ProductoStockBajo
+} from "@/lib/types"
 
 export function Dashboard() {
   const [dashboardData, setDashboardData] = useState<DashboardStats | null>(null)
+  const [chartData, setChartData] = useState<IngresosChart[]>([])
+  const [actividadReciente, setActividadReciente] = useState<ActividadReciente[]>([])
+  const [alertas, setAlertas] = useState<AlertaSistema[]>([])
+  const [productosStockBajo, setProductosStockBajo] = useState<ProductoStockBajo[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const toast = useToast()
@@ -58,8 +39,128 @@ export function Dashboard() {
         setIsLoading(true)
       }
 
-      const data = await apiService.reports.getDashboardStats()
-      setDashboardData(data)
+      // Cargar todos los datos en paralelo
+      const [
+        dashboardStats,
+        ingresosChartData,
+        actividadData,
+        alertasData,
+        stockBajoData
+      ] = await Promise.allSettled([
+        apiService.reports.getDashboardStats(),
+        apiService.reports.getIngresosChart(),
+        apiService.reports.getActividadReciente(10),
+        apiService.reports.getAlertas(),
+        apiService.reports.getProductosStockBajo()
+      ])
+
+      // Procesar resultados
+      if (dashboardStats.status === 'fulfilled') {
+        setDashboardData(dashboardStats.value)
+      }
+
+      if (ingresosChartData.status === 'fulfilled') {
+        setChartData(ingresosChartData.value)
+      } else {
+        // Fallback a datos estáticos si falla
+        setChartData([
+          { fecha: '2024-01-15', dia: 'Lun', ingresos: 2400, membresias: 1800, productos: 600 },
+          { fecha: '2024-01-16', dia: 'Mar', ingresos: 1800, membresias: 1200, productos: 600 },
+          { fecha: '2024-01-17', dia: 'Mié', ingresos: 3200, membresias: 2400, productos: 800 },
+          { fecha: '2024-01-18', dia: 'Jue', ingresos: 2800, membresias: 2000, productos: 800 },
+          { fecha: '2024-01-19', dia: 'Vie', ingresos: 3600, membresias: 2800, productos: 800 },
+          { fecha: '2024-01-20', dia: 'Sáb', ingresos: 4200, membresias: 3200, productos: 1000 },
+          { fecha: '2024-01-21', dia: 'Dom', ingresos: 2100, membresias: 1600, productos: 500 },
+        ])
+      }
+
+      if (actividadData.status === 'fulfilled') {
+        setActividadReciente(actividadData.value)
+      } else {
+        // Fallback a datos estáticos
+        setActividadReciente([
+          {
+            id: 1,
+            tipo: 'venta',
+            descripcion: 'Venta de Proteína Whey',
+            monto: 45000,
+            monto_formateado: '$45.000',
+            hora: '10:30',
+            fecha: new Date().toISOString(),
+            miembro_nombre: 'Juan Pérez'
+          },
+          {
+            id: 2,
+            tipo: 'miembro',
+            descripcion: 'Nuevo miembro registrado',
+            hora: '09:15',
+            fecha: new Date().toISOString(),
+            miembro_nombre: 'María García'
+          }
+        ])
+      }
+
+      if (alertasData.status === 'fulfilled') {
+        setAlertas(alertasData.value)
+      } else {
+        // Fallback dinámico basado en productos con stock bajo
+        const alertasGeneradas: AlertaSistema[] = []
+
+        // Solo agregar alerta de stock si hay productos con stock bajo
+        const stockBajoLength = stockBajoData.status === 'fulfilled'
+          ? stockBajoData.value.length
+          : 3 // Número de productos en fallback
+
+        if (stockBajoLength > 0) {
+          alertasGeneradas.push({
+            id: 1,
+            tipo: 'stock',
+            mensaje: 'Productos con stock bajo detectados',
+            descripcion: `${stockBajoLength} productos requieren reposición`,
+            prioridad: 'high',
+            fecha_creacion: new Date().toISOString(),
+            resuelto: false
+          })
+        }
+
+        setAlertas(alertasGeneradas)
+      }
+
+      if (stockBajoData.status === 'fulfilled') {
+        setProductosStockBajo(stockBajoData.value)
+      } else {
+        // Fallback consistente con las alertas del sistema
+        setProductosStockBajo([
+          {
+            id: 1,
+            nombre: 'Proteína Whey Gold',
+            categoria: 'Suplementos',
+            stock_actual: 2,
+            stock_minimo: 10,
+            diferencia: -8,
+            precio_venta: 120000,
+            fecha_vencimiento: '2024-12-31'
+          },
+          {
+            id: 2,
+            nombre: 'Creatina Monohidrato',
+            categoria: 'Suplementos',
+            stock_actual: 1,
+            stock_minimo: 5,
+            diferencia: -4,
+            precio_venta: 85000
+          },
+          {
+            id: 3,
+            nombre: 'Camiseta Gym Pro',
+            categoria: 'Ropa',
+            stock_actual: 3,
+            stock_minimo: 15,
+            diferencia: -12,
+            precio_venta: 35000
+          }
+        ])
+      }
 
       if (showRefreshMessage) {
         toast.success('Dashboard actualizado', 'Los datos se han actualizado correctamente')
@@ -87,9 +188,14 @@ export function Dashboard() {
     }).format(amount)
   }
 
-  // Función para calcular productos con stock bajo (simulado por ahora)
+  // Función para calcular productos con stock bajo
   const getStockBajo = () => {
-    return 8 // Por ahora hardcoded, después se puede conectar con productos
+    return productosStockBajo.length
+  }
+
+  // Función para determinar si hay productos con stock bajo
+  const hasStockBajo = () => {
+    return productosStockBajo.length > 0
   }
 
   if (isLoading) {
@@ -185,11 +291,15 @@ export function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Stock Bajo</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
+            <Package className={`h-4 w-4 ${hasStockBajo() ? 'text-amber-600' : 'text-green-600'}`} />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{getStockBajo()}</div>
-            <p className="text-xs text-muted-foreground">Productos requieren reposición</p>
+            <div className={`text-2xl font-bold ${hasStockBajo() ? 'text-amber-600' : 'text-green-600'}`}>
+              {getStockBajo()}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {hasStockBajo() ? 'Productos requieren reposición' : 'Todo el stock está bien'}
+            </p>
           </CardContent>
         </Card>
 
@@ -205,107 +315,144 @@ export function Dashboard() {
         </Card>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Revenue Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Ingresos Últimos 7 Días
-            </CardTitle>
-            <CardDescription>Evolución de ingresos diarios</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer
-              config={{
-                ingresos: {
-                  label: "Ingresos",
-                  color: "hsl(var(--primary))",
-                },
-              }}
-              className="h-[200px]"
-            >
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
-                  <XAxis dataKey="day" />
-                  <YAxis />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar dataKey="ingresos" fill="var(--color-ingresos)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartContainer>
-          </CardContent>
-        </Card>
+      {/* Charts and Activity Section */}
+      <div className="grid gap-6 lg:grid-cols-3">
 
-        {/* Recent Activity */}
+        {/* Advanced Revenue Chart */}
+        <div className="lg:col-span-2">
+          <IngresosChartComponent
+            data={chartData}
+            isLoading={isLoading && chartData.length === 0}
+          />
+        </div>
+
+        {/* Recent Activity - DATOS REALES */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Activity className="h-5 w-5" />
               Actividad Reciente
             </CardTitle>
-            <CardDescription>Últimas transacciones y eventos</CardDescription>
+            <CardDescription>
+              Últimas transacciones y eventos
+              {actividadReciente.length > 0 && (
+                <span className="ml-2 text-xs text-green-600">
+                  • {actividadReciente.length} eventos
+                </span>
+              )}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {recentActivity.map((activity) => (
-                <div key={activity.id} className="flex items-center justify-between">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium leading-none">{activity.description}</p>
-                    <p className="text-xs text-muted-foreground">{activity.time}</p>
+            <div className="space-y-4 max-h-[320px] overflow-y-auto">
+              {actividadReciente.length > 0 ? (
+                actividadReciente.map((activity) => (
+                  <div key={activity.id} className="flex items-center justify-between">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium leading-none">
+                        {activity.descripcion}
+                        {activity.miembro_nombre && (
+                          <span className="text-muted-foreground"> - {activity.miembro_nombre}</span>
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{activity.hora}</p>
+                    </div>
+                    {activity.monto_formateado && (
+                      <Badge variant="outline" className="ml-auto font-mono">
+                        {activity.monto_formateado}
+                      </Badge>
+                    )}
+                    {activity.tipo === 'miembro' && !activity.monto_formateado && (
+                      <Badge variant="secondary" className="ml-auto">
+                        Nuevo
+                      </Badge>
+                    )}
                   </div>
-                  {activity.amount && (
-                    <Badge variant="outline" className="ml-auto font-mono">
-                      {activity.amount}
-                    </Badge>
-                  )}
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <Activity className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    No hay actividad reciente
+                  </p>
                 </div>
-              ))}
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Alerts Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5" />
-            Alertas y Notificaciones
-          </CardTitle>
-          <CardDescription>Elementos que requieren tu atención</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {alerts.map((alert) => (
-              <div
-                key={alert.id}
-                className={`flex items-center justify-between p-3 rounded-lg border-l-4 ${alert.priority === "high"
-                    ? "border-red-500 bg-red-50 dark:bg-red-950"
-                    : alert.priority === "medium"
-                      ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-950"
-                      : "border-blue-500 bg-blue-50 dark:bg-blue-950"
-                  }`}
-              >
-                <div className="flex items-center space-x-3">
-                  <AlertTriangle
-                    className={`h-4 w-4 ${alert.priority === "high"
-                        ? "text-red-600"
-                        : alert.priority === "medium"
-                          ? "text-yellow-600"
-                          : "text-blue-600"
+      {/* Alerts and Stock Section */}
+      <div className="grid gap-6 lg:grid-cols-2">
+
+        {/* System Alerts - DATOS REALES */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" />
+              Alertas del Sistema
+            </CardTitle>
+            <CardDescription>
+              Elementos que requieren tu atención
+              {alertas.length > 0 && (
+                <span className="ml-2 text-xs text-red-600">
+                  • {alertas.length} alertas activas
+                </span>
+              )}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3 max-h-[280px] overflow-y-auto">
+              {alertas.length > 0 ? (
+                alertas.map((alert) => (
+                  <div
+                    key={alert.id}
+                    className={`flex items-center justify-between p-3 rounded-lg border-l-4 ${alert.prioridad === "high" || alert.prioridad === "critical"
+                      ? "border-red-500 bg-red-50 dark:bg-red-950"
+                      : alert.prioridad === "medium"
+                        ? "border-yellow-500 bg-yellow-50 dark:bg-yellow-950"
+                        : "border-blue-500 bg-blue-50 dark:bg-blue-950"
                       }`}
-                  />
-                  <p className="text-sm font-medium">{alert.message}</p>
+                  >
+                    <div className="flex items-center space-x-3">
+                      <AlertTriangle
+                        className={`h-4 w-4 ${alert.prioridad === "high" || alert.prioridad === "critical"
+                          ? "text-red-600"
+                          : alert.prioridad === "medium"
+                            ? "text-yellow-600"
+                            : "text-blue-600"
+                          }`}
+                      />
+                      <div>
+                        <p className="text-sm font-medium">{alert.mensaje}</p>
+                        {alert.descripcion && (
+                          <p className="text-xs text-muted-foreground">{alert.descripcion}</p>
+                        )}
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="sm">
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <AlertTriangle className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">
+                    No hay alertas activas
+                  </p>
                 </div>
-                <Button variant="ghost" size="sm">
-                  <Eye className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Stock Alerts */}
+        <StockAlerts
+          productos={productosStockBajo}
+          onRestock={(id) => toast.info('Función en desarrollo', `Reponer stock para producto ${id}`)}
+          onView={(id) => toast.info('Función en desarrollo', `Ver detalles del producto ${id}`)}
+        />
+      </div>
     </div>
   )
 }

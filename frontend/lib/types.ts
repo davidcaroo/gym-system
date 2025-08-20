@@ -225,6 +225,54 @@ export interface DashboardStats {
   nps_score?: number;
 }
 
+// Datos para gráfico de ingresos (7 días)
+export interface IngresosChart {
+  fecha: string;
+  dia: string;
+  ingresos: number;
+  membresias: number;
+  productos: number;
+}
+
+// Actividad reciente
+export interface ActividadReciente {
+  id: number;
+  tipo: 'venta' | 'miembro' | 'pago' | 'acceso';
+  descripcion: string;
+  monto?: number;
+  monto_formateado?: string;
+  hora: string;
+  fecha: string;
+  icono?: string;
+  miembro_nombre?: string;
+  producto_nombre?: string;
+}
+
+// Alertas del sistema
+export interface AlertaSistema {
+  id: number;
+  tipo: 'stock' | 'vencimiento' | 'pago' | 'sistema';
+  mensaje: string;
+  descripcion?: string;
+  prioridad: 'low' | 'medium' | 'high' | 'critical';
+  fecha_creacion: string;
+  resuelto: boolean;
+  accion_requerida?: string;
+  url_accion?: string;
+}
+
+// Productos con stock bajo
+export interface ProductoStockBajo {
+  id: number;
+  nombre: string;
+  categoria: string;
+  stock_actual: number;
+  stock_minimo: number;
+  diferencia: number;
+  precio_venta: number;
+  fecha_vencimiento?: string;
+}
+
 // Reporte de ingresos
 export interface ReporteIngresos {
   fecha: string;
