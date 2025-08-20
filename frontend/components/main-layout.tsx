@@ -8,17 +8,14 @@ import { MembersPage } from "@/components/members-page"
 import { PointOfSalePage } from "@/components/point-of-sale-page"
 import { ProductsPage } from "@/components/products-page"
 import { Toaster } from "@/components/ui/toaster"
-
-interface MainLayoutProps {
-  user: { name: string; role: string } | null
-  onLogout: () => void
-}
+import { useProtectedRoute } from "@/lib/protected-route"
 
 export type Page = "dashboard" | "members" | "pos" | "products"
 
-export function MainLayout({ user, onLogout }: MainLayoutProps) {
+export function MainLayout() {
   const [currentPage, setCurrentPage] = useState<Page>("dashboard")
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const { user, logout } = useProtectedRoute()
 
   const renderPage = () => {
     switch (currentPage) {
@@ -45,7 +42,14 @@ export function MainLayout({ user, onLogout }: MainLayoutProps) {
       />
 
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header user={user} onLogout={onLogout} onMenuClick={() => setSidebarOpen(!sidebarOpen)} />
+        <Header
+          user={user ? {
+            name: user.nombre_completo || user.username,
+            role: 'admin' // Por ahora fijo, se puede expandir en el futuro
+          } : null}
+          onLogout={logout}
+          onMenuClick={() => setSidebarOpen(!sidebarOpen)}
+        />
 
         <main className="flex-1 overflow-auto p-6">{renderPage()}</main>
       </div>

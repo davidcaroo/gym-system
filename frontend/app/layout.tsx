@@ -3,6 +3,10 @@ import type { Metadata } from "next"
 import { Inter, Montserrat } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
+import { AuthProvider } from "@/lib/auth"
+import { AppProvider } from "@/lib/app-context"
+import { ErrorBoundary } from "@/lib/error-boundary"
+import { ToastProvider } from "@/lib/toast"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -31,9 +35,17 @@ export default function RootLayout({
   return (
     <html lang="es" className={`${inter.variable} ${montserrat.variable}`}>
       <body className="font-sans antialiased">
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
-          {children}
-        </ThemeProvider>
+        <ErrorBoundary>
+          <AppProvider>
+            <AuthProvider>
+              <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
+                <ToastProvider>
+                  {children}
+                </ToastProvider>
+              </ThemeProvider>
+            </AuthProvider>
+          </AppProvider>
+        </ErrorBoundary>
       </body>
     </html>
   )

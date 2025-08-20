@@ -3,41 +3,50 @@
 import type React from "react"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Dumbbell, Loader2 } from "lucide-react"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Dumbbell, Loader2, AlertCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/lib/auth"
+import { DEFAULT_PROTECTED_ROUTE } from "@/lib/protected-route"
 
-interface LoginPageProps {
-  onLogin: (username: string, password: string) => boolean
-}
-
-export function LoginPage({ onLogin }: LoginPageProps) {
+export function LoginPage() {
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const { toast } = useToast()
+  const { login, error, clearError } = useAuth()
+  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    clearError()
 
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    try {
+      const success = await login({ username, password })
 
-    const success = onLogin(username, password)
+      if (success) {
+        toast({
+          title: "¡Bienvenido!",
+          description: "Has iniciado sesión correctamente",
+        })
 
-    if (!success) {
-      toast({
-        title: "Error de autenticación",
-        description: "Usuario o contraseña incorrectos",
-        variant: "destructive",
-      })
+        // Redirigir a la página guardada o al dashboard
+        const redirectTo = localStorage.getItem('redirectAfterLogin') || DEFAULT_PROTECTED_ROUTE
+        localStorage.removeItem('redirectAfterLogin')
+        router.push(redirectTo)
+      }
+    } catch (error) {
+      // El error ya se maneja en el contexto
+      console.error('Error en login:', error)
+    } finally {
+      setIsLoading(false)
     }
-
-    setIsLoading(false)
   }
 
   return (
@@ -59,6 +68,13 @@ export function LoginPage({ onLogin }: LoginPageProps) {
             <CardDescription>Ingresa tus credenciales para acceder al sistema</CardDescription>
           </CardHeader>
           <CardContent>
+            {error && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="username">Usuario</Label>
@@ -68,6 +84,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                   placeholder="Ingresa tu usuario"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
+                  disabled={isLoading}
                   required
                 />
               </div>
@@ -79,6 +96,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                   placeholder="Ingresa tu contraseña"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  disabled={isLoading}
                   required
                 />
               </div>
@@ -95,10 +113,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
             </form>
             <div className="mt-4 text-center text-sm text-muted-foreground">
               <p>
-                Usuario de prueba: <strong>admin</strong>
-              </p>
-              <p>
-                Contraseña: <strong>admin</strong>
+                Ingresa tus credenciales del sistema
               </p>
             </div>
           </CardContent>

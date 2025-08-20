@@ -1,31 +1,33 @@
 "use client"
 
-import { useState } from "react"
-import { LoginPage } from "@/components/login-page"
-import { MainLayout } from "@/components/main-layout"
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/lib/auth"
+import { DEFAULT_PROTECTED_ROUTE } from "@/lib/protected-route"
 
-export default function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [user, setUser] = useState<{ name: string; role: string } | null>(null)
+export default function HomePage() {
+  const { isAuthenticated, isLoading } = useAuth()
+  const router = useRouter()
 
-  const handleLogin = (username: string, password: string) => {
-    // Mock authentication - in real app this would call an API
-    if (username === "admin" && password === "admin") {
-      setUser({ name: "Administrador", role: "admin" })
-      setIsLoggedIn(true)
-      return true
+  useEffect(() => {
+    if (!isLoading) {
+      if (isAuthenticated) {
+        // Si está autenticado, redirigir al dashboard
+        router.push(DEFAULT_PROTECTED_ROUTE)
+      } else {
+        // Si no está autenticado, redirigir al login
+        router.push('/login')
+      }
     }
-    return false
-  }
+  }, [isAuthenticated, isLoading, router])
 
-  const handleLogout = () => {
-    setIsLoggedIn(false)
-    setUser(null)
-  }
-
-  if (!isLoggedIn) {
-    return <LoginPage onLogin={handleLogin} />
-  }
-
-  return <MainLayout user={user} onLogout={handleLogout} />
+  // Página de carga mientras se determina el estado
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+        <p className="text-muted-foreground">Cargando...</p>
+      </div>
+    </div>
+  )
 }
