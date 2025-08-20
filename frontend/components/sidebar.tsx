@@ -1,6 +1,6 @@
 "use client"
 
-import { cn } from "@/frontend/lib/utils"
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { LayoutDashboard, Users, ShoppingCart, Package, Dumbbell, X } from "lucide-react"
 import type { Page } from "@/components/main-layout"

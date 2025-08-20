@@ -1,5 +1,6 @@
 import { getDatabase } from './connection';
 import { logger } from '../utils/logger';
+import { AuthModel } from '../models/AuthModel';
 
 export const initializeDatabase = async (): Promise<void> => {
   const db = getDatabase();
@@ -114,6 +115,19 @@ export const initializeDatabase = async (): Promise<void> => {
       )
     `);
 
+    // Crear tabla usuarios_sistema
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS usuarios_sistema (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username VARCHAR(50) UNIQUE NOT NULL,
+        password_hash VARCHAR(255) NOT NULL,
+        nombre_completo VARCHAR(255),
+        activo BOOLEAN DEFAULT TRUE,
+        ultimo_acceso DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Crear índices para mejorar el rendimiento
     db.exec(`
       CREATE INDEX IF NOT EXISTS idx_miembros_documento ON miembros(documento);
@@ -126,9 +140,17 @@ export const initializeDatabase = async (): Promise<void> => {
       CREATE INDEX IF NOT EXISTS idx_ventas_fecha ON ventas(fecha_venta);
       CREATE INDEX IF NOT EXISTS idx_accesos_miembro ON accesos(miembro_id);
       CREATE INDEX IF NOT EXISTS idx_accesos_entrada ON accesos(fecha_entrada);
+      CREATE INDEX IF NOT EXISTS idx_usuarios_username ON usuarios_sistema(username);
+      CREATE INDEX IF NOT EXISTS idx_usuarios_activo ON usuarios_sistema(activo);
     `);
 
     logger.info('Base de datos inicializada correctamente con todas las tablas');
+    
+    // Crear usuario administrador inicial
+    const authModel = new AuthModel();
+    authModel.createDefaultUser();
+    logger.info('Usuario administrador inicial creado/verificado');
+    
   } catch (error) {
     logger.error('Error al inicializar la base de datos:', error);
     throw error;

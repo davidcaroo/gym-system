@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Dumbbell, Loader2 } from "lucide-react"
-import { useToast } from "@/frontend/hooks/use-toast"
+import { useToast } from "@/hooks/use-toast"
 
 interface LoginPageProps {
   onLogin: (username: string, password: string) => boolean

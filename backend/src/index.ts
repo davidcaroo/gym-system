@@ -1,10 +1,13 @@
 import express from 'express';
 import cors from 'cors';
+import session from 'express-session';
 import { initializeDatabase } from './database/init';
 import { errorHandler } from './middleware/errorHandler';
+import { requireAuth } from './middleware/auth';
 import { logger } from './utils/logger';
 
 // Importar rutas
+import authRoutes from './routes/auth';
 import miembrosRoutes from './routes/miembros';
 import membresiaRoutes from './routes/membresias';
 import pagosRoutes from './routes/pagos';
@@ -25,6 +28,18 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// Configurar sesiones
+app.use(session({
+  secret: 'gym-system-secret-key-2025',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: false, // true en producción con HTTPS
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000 // 24 horas
+  }
+}));
+
 // Logging middleware
 app.use((req, res, next) => {
   logger.info(`${req.method} ${req.path}`, {
@@ -35,13 +50,17 @@ app.use((req, res, next) => {
 });
 
 // Rutas de la API
-app.use('/api/miembros', miembrosRoutes);
-app.use('/api/membresias', membresiaRoutes);
-app.use('/api/pagos', pagosRoutes);
-app.use('/api/productos', productosRoutes);
-app.use('/api/ventas', ventasRoutes);
-app.use('/api/accesos', accesosRoutes);
-app.use('/api/reportes', reportesRoutes);
+// Rutas públicas (no requieren autenticación)
+app.use('/api/auth', authRoutes);
+
+// Rutas protegidas (requieren autenticación)
+app.use('/api/miembros', requireAuth, miembrosRoutes);
+app.use('/api/membresias', requireAuth, membresiaRoutes);
+app.use('/api/pagos', requireAuth, pagosRoutes);
+app.use('/api/productos', requireAuth, productosRoutes);
+app.use('/api/ventas', requireAuth, ventasRoutes);
+app.use('/api/accesos', accesosRoutes); // Sin requireAuth global - se maneja individualmente
+app.use('/api/reportes', requireAuth, reportesRoutes);
 
 // Ruta de salud
 app.get('/health', (req, res) => {

@@ -1,4 +1,4 @@
-{frontend/next-env.d.ts
+{
   "compilerOptions": {
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
