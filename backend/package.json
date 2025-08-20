@@ -1,0 +1,33 @@
+{
+  "name": "gym-system-backend",
+  "version": "1.0.0",
+  "description": "Backend para Sistema de Gestión de Gimnasios",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "init-db": "ts-node src/scripts/initDb.ts",
+    "seed": "ts-node src/scripts/seedData.ts",
+    "clean": "rimraf dist"
+  },
+  "keywords": ["gym", "management", "express", "sqlite"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "better-sqlite3": "^8.7.0",
+    "cors": "^2.8.5",
+    "joi": "^17.11.0",
+    "winston": "^3.11.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.8.10",
+    "@types/better-sqlite3": "^7.6.8",
+    "@types/cors": "^2.8.17",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.2.2",
+    "rimraf": "^5.0.5"
+  }
+}
