@@ -5,12 +5,13 @@ import { Sidebar } from "@/components/sidebar"
 import { Header } from "@/components/header"
 import { Dashboard } from "@/components/dashboard"
 import { MembersPage } from "@/components/members-page"
+import { MembershipsPage } from "@/components/memberships-page"
 import { PointOfSalePage } from "@/components/point-of-sale-page"
 import { ProductsPage } from "@/components/products-page"
 import { Toaster } from "@/components/ui/toaster"
 import { useProtectedRoute } from "@/lib/protected-route"
 
-export type Page = "dashboard" | "members" | "pos" | "products"
+export type Page = "dashboard" | "members" | "memberships" | "pos" | "products"
 
 export function MainLayout() {
   const [currentPage, setCurrentPage] = useState<Page>("dashboard")
@@ -23,6 +24,8 @@ export function MainLayout() {
         return <Dashboard />
       case "members":
         return <MembersPage />
+      case "memberships":
+        return <MembershipsPage />
       case "pos":
         return <PointOfSalePage />
       case "products":

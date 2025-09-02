@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { LayoutDashboard, Users, ShoppingCart, Package, Dumbbell, X } from "lucide-react"
+import { LayoutDashboard, Users, ShoppingCart, Package, Dumbbell, X, CreditCard } from "lucide-react"
 import type { Page } from "@/components/main-layout"
 
 interface SidebarProps {
@@ -15,6 +15,7 @@ interface SidebarProps {
 const navigation = [
   { id: "dashboard" as Page, name: "Dashboard", icon: LayoutDashboard },
   { id: "members" as Page, name: "Miembros", icon: Users },
+  { id: "memberships" as Page, name: "Membresías", icon: CreditCard },
   { id: "pos" as Page, name: "Punto de Venta", icon: ShoppingCart },
   { id: "products" as Page, name: "Productos", icon: Package },
 ]
