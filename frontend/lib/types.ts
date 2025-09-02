@@ -334,14 +334,6 @@ export interface LoadingState {
   error?: string | null;
 }
 
-// Paginación
-export interface PaginationInfo {
-  page: number;
-  limit: number;
-  total: number;
-  totalPages: number;
-}
-
 // === ALIASES PARA COMPATIBILIDAD ===
 export type Membership = TipoMembresia;
 export type Producto = Product;

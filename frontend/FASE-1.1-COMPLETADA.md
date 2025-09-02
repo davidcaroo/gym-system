@@ -20,7 +20,7 @@
   - Tipos de membresías: `TipoMembresia`, `Membership`
   - Tipos de requests: `LoginRequest`, `MemberRequest`, `ProductRequest`, etc.
   - Tipos de reportes: `DashboardStats`, `SalesReport`, `AccessReport`, etc.
-  - Tipos genéricos: `ApiResponse<T>`, `LoadingState`, `PaginationInfo`
+  - Tipos genéricos: `ApiResponse<T>`, `LoadingState`
   - Compatibilidad con backend: Nombres en español según modelo de datos
 
 #### **3. ✅ Crear lib/errorHandler.ts - Manejo de errores centralizados**
