@@ -144,7 +144,11 @@ export interface MemberRequest {
   telefono?: string;
   documento?: string;
   fecha_nacimiento?: string;
+<<<<<<< HEAD
+  tipo_membresia_id?: number | null;
+=======
   tipo_membresia_id?: number;
+>>>>>>> origin/main
   estado?: 'activo' | 'inactivo' | 'suspendido';
   foto_url?: string;
   direccion?: string;
