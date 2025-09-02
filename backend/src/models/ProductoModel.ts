@@ -44,6 +44,20 @@ export class ProductoModel {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
+    // Log para debug
+    console.log('Datos para insertar:', {
+      nombre: producto.nombre,
+      codigo_barras: producto.codigo_barras,
+      descripcion: producto.descripcion,
+      categoria: producto.categoria,
+      precio_compra: producto.precio_compra,
+      precio_venta: producto.precio_venta,
+      stock_actual: producto.stock_actual,
+      stock_minimo: producto.stock_minimo,
+      fecha_vencimiento: producto.fecha_vencimiento,
+      proveedor: producto.proveedor
+    });
+
     const result = stmt.run(
       producto.nombre,
       producto.codigo_barras || null,
@@ -51,8 +65,8 @@ export class ProductoModel {
       producto.categoria,
       producto.precio_compra || null,
       producto.precio_venta,
-      producto.stock_actual || 0,
-      producto.stock_minimo || 5,
+      Number(producto.stock_actual || 0),
+      Number(producto.stock_minimo || 5),
       producto.fecha_vencimiento || null,
       producto.proveedor || null,
       1 // activo
@@ -155,7 +169,7 @@ export class ProductoModel {
       SELECT * FROM productos 
       WHERE categoria = ? AND activo = 1 
       ORDER BY nombre
-    `).get(categoria) as Producto[];
+    `).all(categoria) as Producto[];
   }
 
   // Productos próximos a vencer (dentro de 30 días)

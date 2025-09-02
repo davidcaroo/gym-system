@@ -273,6 +273,26 @@ export const productsService = {
     );
     return extractData(response);
   }),
+
+  /**
+   * Obtener estadísticas de productos
+   */
+  getStats: withErrorHandling(async (): Promise<{
+    total_productos: number;
+    stock_bajo: number;
+    por_categoria: { categoria: string; cantidad: number }[];
+    valor_inventario: number;
+  }> => {
+    const response = await httpClient.get<ApiResponse<{
+      total_productos: number;
+      stock_bajo: number;
+      por_categoria: { categoria: string; cantidad: number }[];
+      valor_inventario: number;
+    }>>(
+      API_ENDPOINTS.PRODUCTS.STATS
+    );
+    return extractData(response);
+  }),
 };
 
 /**

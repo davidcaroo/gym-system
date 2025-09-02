@@ -1,380 +1,607 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Textarea } from "@/components/ui/textarea"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
 } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Search, Filter, Edit, Trash2, Package, AlertTriangle, TrendingDown } from "lucide-react"
+import { Plus, Search, Filter, Edit, Trash2, Package, AlertTriangle, TrendingDown, Loader2 } from "lucide-react"
+import { toast } from "@/hooks/use-toast"
+import { apiService } from "@/lib/apiService"
 
 interface Product {
-  id: string
-  nombre: string
-  codigoBarras: string
-  categoria: "suplementos" | "bebidas" | "accesorios" | "ropa"
-  precioCompra: number
-  precioVenta: number
-  stock: number
-  stockMinimo: number
-  proveedor: string
-  fechaVencimiento?: string
+    id: number
+    nombre: string
+    codigo_barras?: string
+    categoria: "suplementos" | "bebidas" | "accesorios" | "ropa"
+    precio_compra?: number
+    precio_venta: number
+    stock_actual?: number
+    stock_minimo?: number
+    proveedor?: string
+    fecha_vencimiento?: string
+    descripcion?: string
+    activo?: boolean
 }
 
-const MOCK_PRODUCTS: Product[] = [
-  {
-    id: "1",
-    nombre: "Proteína Whey Gold",
-    codigoBarras: "7891234567890",
-    categoria: "suplementos",
-    precioCompra: 35000,
-    precioVenta: 45000,
-    stock: 12,
-    stockMinimo: 5,
-    proveedor: "NutriSupplements",
-    fechaVencimiento: "2025-12-15",
-  },
-  {
-    id: "2",
-    nombre: "Creatina Monohidrato",
-    codigoBarras: "7891234567891",
-    categoria: "suplementos",
-    precioCompra: 25000,
-    precioVenta: 35000,
-    stock: 3,
-    stockMinimo: 5,
-    proveedor: "NutriSupplements",
-    fechaVencimiento: "2026-06-20",
-  },
-  {
-    id: "3",
-    nombre: "Bebida Energética",
-    codigoBarras: "7891234567892",
-    categoria: "bebidas",
-    precioCompra: 6000,
-    precioVenta: 8500,
-    stock: 25,
-    stockMinimo: 10,
-    proveedor: "EnergyDrinks Co",
-    fechaVencimiento: "2025-03-10",
-  },
-  {
-    id: "4",
-    nombre: "Toalla Deportiva",
-    codigoBarras: "7891234567893",
-    categoria: "accesorios",
-    precioCompra: 18000,
-    precioVenta: 25000,
-    stock: 15,
-    stockMinimo: 8,
-    proveedor: "SportGear",
-  },
-  {
-    id: "5",
-    nombre: "Shaker Premium",
-    codigoBarras: "7891234567894",
-    categoria: "accesorios",
-    precioCompra: 12000,
-    precioVenta: 18000,
-    stock: 20,
-    stockMinimo: 10,
-    proveedor: "SportGear",
-  },
-  {
-    id: "6",
-    nombre: "Camiseta GymPro",
-    codigoBarras: "7891234567895",
-    categoria: "ropa",
-    precioCompra: 22000,
-    precioVenta: 32000,
-    stock: 2,
-    stockMinimo: 5,
-    proveedor: "TextilSport",
-  },
-]
+interface ProductStats {
+    total_productos: number
+    stock_bajo: number
+    por_categoria: { categoria: string; cantidad: number }[]
+    valor_inventario: number
+}
 
 export function ProductsPage() {
-  const [products, setProducts] = useState<Product[]>(MOCK_PRODUCTS)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [filterCategory, setFilterCategory] = useState<string>("all")
-  const [filterStock, setFilterStock] = useState<string>("all")
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+    const [products, setProducts] = useState<Product[]>([])
+    const [stats, setStats] = useState<ProductStats | null>(null)
+    const [searchTerm, setSearchTerm] = useState("")
+    const [filterCategory, setFilterCategory] = useState<string>("all")
+    const [filterStock, setFilterStock] = useState<string>("all")
+    const [isDialogOpen, setIsDialogOpen] = useState(false)
+    const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+    const [isLoading, setIsLoading] = useState(true)
+    const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const filteredProducts = products.filter((product) => {
-    const matchesSearch =
-      product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || product.codigoBarras.includes(searchTerm)
-    const matchesCategory = filterCategory === "all" || product.categoria === filterCategory
-    const matchesStock =
-      filterStock === "all" ||
-      (filterStock === "low" && product.stock <= product.stockMinimo) ||
-      (filterStock === "out" && product.stock === 0)
-    return matchesSearch && matchesCategory && matchesStock
-  })
+    // Formulario
+    const [formData, setFormData] = useState({
+        nombre: "",
+        codigo_barras: "",
+        descripcion: "",
+        categoria: "suplementos" as const,
+        precio_compra: "",
+        precio_venta: "",
+        stock_actual: "",
+        stock_minimo: "",
+        proveedor: "",
+        fecha_vencimiento: ""
+    })
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat("es-CO", {
-      style: "currency",
-      currency: "COP",
-      minimumFractionDigits: 0,
-    }).format(price)
-  }
+    // Cargar datos iniciales
+    useEffect(() => {
+        loadProducts()
+        loadStats()
+    }, [])
 
-  const getStockStatus = (product: Product) => {
-    if (product.stock === 0) return { status: "out", color: "destructive", text: "Agotado" }
-    if (product.stock <= product.stockMinimo) return { status: "low", color: "secondary", text: "Stock Bajo" }
-    return { status: "ok", color: "default", text: "Disponible" }
-  }
+    const loadProducts = async () => {
+        try {
+            setIsLoading(true)
+            const response = await apiService.products.getAll()
+            setProducts(response)
+        } catch (error: any) {
+            toast({
+                title: "Error al cargar productos",
+                description: error.message || "No se pudieron cargar los productos",
+                variant: "destructive",
+            })
+        } finally {
+            setIsLoading(false)
+        }
+    }
 
-  const lowStockCount = products.filter((p) => p.stock <= p.stockMinimo && p.stock > 0).length
-  const outOfStockCount = products.filter((p) => p.stock === 0).length
+    const loadStats = async () => {
+        try {
+            const response = await apiService.products.getStats()
+            setStats(response)
+        } catch (error: any) {
+            console.error('Error al cargar estadísticas:', error)
+        }
+    }
 
-  return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold font-montserrat">Inventario de Productos</h1>
-          <p className="text-muted-foreground">Gestiona el inventario y precios de productos</p>
-        </div>
+    // Crear producto
+    const handleCreateProduct = async () => {
+        try {
+            setIsSubmitting(true)
+            const productData = {
+                nombre: formData.nombre,
+                codigo_barras: formData.codigo_barras || undefined,
+                descripcion: formData.descripcion || undefined,
+                categoria: formData.categoria,
+                precio_compra: formData.precio_compra ? Number(formData.precio_compra) : undefined,
+                precio_venta: Number(formData.precio_venta),
+                stock_actual: formData.stock_actual ? Number(formData.stock_actual) : 0,
+                stock_minimo: formData.stock_minimo ? Number(formData.stock_minimo) : 5,
+                proveedor: formData.proveedor || undefined,
+                fecha_vencimiento: formData.fecha_vencimiento || undefined
+            }
 
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => setEditingProduct(null)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nuevo Producto
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
-            <DialogHeader>
-              <DialogTitle>{editingProduct ? "Editar Producto" : "Nuevo Producto"}</DialogTitle>
-              <DialogDescription>
-                {editingProduct ? "Modifica los datos del producto" : "Completa la información del nuevo producto"}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
-              <div className="grid gap-2">
-                <Label htmlFor="name">Nombre del producto</Label>
-                <Input id="name" placeholder="Proteína Whey Gold" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="barcode">Código de barras</Label>
-                <Input id="barcode" placeholder="7891234567890" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="category">Categoría</Label>
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecciona una categoría" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="suplementos">Suplementos</SelectItem>
-                    <SelectItem value="bebidas">Bebidas</SelectItem>
-                    <SelectItem value="accesorios">Accesorios</SelectItem>
-                    <SelectItem value="ropa">Ropa</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="buyPrice">Precio de compra</Label>
-                  <Input id="buyPrice" type="number" placeholder="35000" />
+            await apiService.products.create(productData)
+
+            toast({
+                title: "Producto creado",
+                description: `${formData.nombre} se ha creado exitosamente`,
+            })
+
+            resetForm()
+            setIsDialogOpen(false)
+            loadProducts() // Recargar lista
+            loadStats() // Actualizar estadísticas
+        } catch (error: any) {
+            toast({
+                title: "Error al crear producto",
+                description: error.message || "No se pudo crear el producto",
+                variant: "destructive",
+            })
+        } finally {
+            setIsSubmitting(false)
+        }
+    }
+
+    // Editar producto
+    const handleEditProduct = async () => {
+        if (!editingProduct) return
+
+        try {
+            setIsSubmitting(true)
+            const productData = {
+                nombre: formData.nombre,
+                codigo_barras: formData.codigo_barras || undefined,
+                descripcion: formData.descripcion || undefined,
+                categoria: formData.categoria,
+                precio_compra: formData.precio_compra ? Number(formData.precio_compra) : undefined,
+                precio_venta: Number(formData.precio_venta),
+                stock_actual: formData.stock_actual ? Number(formData.stock_actual) : undefined,
+                stock_minimo: formData.stock_minimo ? Number(formData.stock_minimo) : undefined,
+                proveedor: formData.proveedor || undefined,
+                fecha_vencimiento: formData.fecha_vencimiento || undefined
+            }
+
+            await apiService.products.update(editingProduct.id, productData)
+
+            toast({
+                title: "Producto actualizado",
+                description: `${formData.nombre} se ha actualizado exitosamente`,
+            })
+
+            resetForm()
+            setIsDialogOpen(false)
+            setEditingProduct(null)
+            loadProducts() // Recargar lista
+            loadStats() // Actualizar estadísticas
+        } catch (error: any) {
+            toast({
+                title: "Error al actualizar producto",
+                description: error.message || "No se pudo actualizar el producto",
+                variant: "destructive",
+            })
+        } finally {
+            setIsSubmitting(false)
+        }
+    }
+
+    // Eliminar producto
+    const handleDeleteProduct = async (product: Product) => {
+        try {
+            await apiService.products.delete(product.id)
+
+            toast({
+                title: "Producto eliminado",
+                description: `${product.nombre} se ha eliminado exitosamente`,
+            })
+
+            loadProducts() // Recargar lista
+            loadStats() // Actualizar estadísticas
+        } catch (error: any) {
+            toast({
+                title: "Error al eliminar producto",
+                description: error.message || "No se pudo eliminar el producto",
+                variant: "destructive",
+            })
+        }
+    }
+
+    // Resetear formulario
+    const resetForm = () => {
+        setFormData({
+            nombre: "",
+            codigo_barras: "",
+            descripcion: "",
+            categoria: "suplementos",
+            precio_compra: "",
+            precio_venta: "",
+            stock_actual: "",
+            stock_minimo: "",
+            proveedor: "",
+            fecha_vencimiento: ""
+        })
+    }
+
+    // Llenar formulario para edición
+    const openEditDialog = (product: Product) => {
+        setEditingProduct(product)
+        setFormData({
+            nombre: product.nombre || "",
+            codigo_barras: product.codigo_barras || "",
+            descripcion: product.descripcion || "",
+            categoria: product.categoria,
+            precio_compra: product.precio_compra?.toString() || "",
+            precio_venta: product.precio_venta.toString(),
+            stock_actual: product.stock_actual?.toString() || "",
+            stock_minimo: product.stock_minimo?.toString() || "",
+            proveedor: product.proveedor || "",
+            fecha_vencimiento: product.fecha_vencimiento || ""
+        })
+        setIsDialogOpen(true)
+    }
+
+    // Manejar envío del formulario
+    const handleSubmit = () => {
+        if (editingProduct) {
+            handleEditProduct()
+        } else {
+            handleCreateProduct()
+        }
+    }
+
+    // Filtrar productos
+    const filteredProducts = products.filter((product) => {
+        const matchesSearch =
+            product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (product.codigo_barras && product.codigo_barras.includes(searchTerm))
+        const matchesCategory = filterCategory === "all" || product.categoria === filterCategory
+        const matchesStock =
+            filterStock === "all" ||
+            (filterStock === "low" && (product.stock_actual || 0) <= (product.stock_minimo || 0)) ||
+            (filterStock === "out" && (product.stock_actual || 0) === 0)
+        return matchesSearch && matchesCategory && matchesStock
+    })
+
+    const formatPrice = (price: number) => {
+        return new Intl.NumberFormat("es-CO", {
+            style: "currency",
+            currency: "COP",
+            minimumFractionDigits: 0,
+        }).format(price)
+    }
+
+    const getStockStatus = (product: Product) => {
+        const stock = product.stock_actual || 0
+        const minStock = product.stock_minimo || 0
+
+        if (stock === 0) return { status: "out", color: "destructive", text: "Agotado" }
+        if (stock <= minStock) return { status: "low", color: "secondary", text: "Stock Bajo" }
+        return { status: "ok", color: "default", text: "Disponible" }
+    }
+
+    const lowStockCount = products.filter((p) => (p.stock_actual || 0) <= (p.stock_minimo || 0) && (p.stock_actual || 0) > 0).length
+    const outOfStockCount = products.filter((p) => (p.stock_actual || 0) === 0).length
+
+    return (
+        <div className="space-y-6">
+            <div className="flex justify-between items-center">
+                <div>
+                    <h1 className="text-3xl font-bold font-montserrat">Inventario de Productos</h1>
+                    <p className="text-muted-foreground">Gestiona el inventario y precios de productos</p>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="sellPrice">Precio de venta</Label>
-                  <Input id="sellPrice" type="number" placeholder="45000" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="stock">Stock actual</Label>
-                  <Input id="stock" type="number" placeholder="12" />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="minStock">Stock mínimo</Label>
-                  <Input id="minStock" type="number" placeholder="5" />
-                </div>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="supplier">Proveedor</Label>
-                <Input id="supplier" placeholder="NutriSupplements" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="expiry">Fecha de vencimiento (opcional)</Label>
-                <Input id="expiry" type="date" />
-              </div>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                Cancelar
-              </Button>
-              <Button onClick={() => setIsDialogOpen(false)}>{editingProduct ? "Actualizar" : "Crear"} Producto</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Productos</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{products.length}</div>
-            <p className="text-xs text-muted-foreground">En inventario</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Stock Bajo</CardTitle>
-            <TrendingDown className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-orange-600">{lowStockCount}</div>
-            <p className="text-xs text-muted-foreground">Requieren reposición</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Agotados</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">{outOfStockCount}</div>
-            <p className="text-xs text-muted-foreground">Sin stock disponible</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Search and Filters */}
-      <div className="flex gap-4 items-center">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-          <Input
-            placeholder="Buscar productos..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-
-        <Select value={filterCategory} onValueChange={setFilterCategory}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas las categorías</SelectItem>
-            <SelectItem value="suplementos">Suplementos</SelectItem>
-            <SelectItem value="bebidas">Bebidas</SelectItem>
-            <SelectItem value="accesorios">Accesorios</SelectItem>
-            <SelectItem value="ropa">Ropa</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={filterStock} onValueChange={setFilterStock}>
-          <SelectTrigger className="w-[150px]">
-            <Filter className="mr-2 h-4 w-4" />
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todo el stock</SelectItem>
-            <SelectItem value="low">Stock bajo</SelectItem>
-            <SelectItem value="out">Agotados</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Products Table */}
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Producto</TableHead>
-                <TableHead>Categoría</TableHead>
-                <TableHead>Precio Compra</TableHead>
-                <TableHead>Precio Venta</TableHead>
-                <TableHead>Stock</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Proveedor</TableHead>
-                <TableHead className="text-right">Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredProducts.map((product) => {
-                const stockStatus = getStockStatus(product)
-                return (
-                  <TableRow key={product.id}>
-                    <TableCell>
-                      <div>
-                        <div className="font-medium">{product.nombre}</div>
-                        <div className="text-sm text-muted-foreground">{product.codigoBarras}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{product.categoria}</Badge>
-                    </TableCell>
-                    <TableCell>{formatPrice(product.precioCompra)}</TableCell>
-                    <TableCell className="font-medium">{formatPrice(product.precioVenta)}</TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        <div>{product.stock} unidades</div>
-                        <div className="text-muted-foreground">Min: {product.stockMinimo}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={stockStatus.color as any}>{stockStatus.text}</Badge>
-                    </TableCell>
-                    <TableCell>{product.proveedor}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setEditingProduct(product)
-                            setIsDialogOpen(true)
-                          }}
-                        >
-                          <Edit className="h-4 w-4" />
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button onClick={() => {
+                            setEditingProduct(null)
+                            resetForm()
+                        }}>
+                            <Plus className="mr-2 h-4 w-4" />
+                            Nuevo Producto
                         </Button>
-                        <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                        <DialogHeader>
+                            <DialogTitle>{editingProduct ? "Editar Producto" : "Nuevo Producto"}</DialogTitle>
+                            <DialogDescription>
+                                {editingProduct ? "Modifica los datos del producto." : "Completa los datos para crear un nuevo producto."}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="nombre">Nombre del producto *</Label>
+                                    <Input
+                                        id="nombre"
+                                        placeholder="Ej: Proteína Whey"
+                                        value={formData.nombre}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, nombre: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="codigo_barras">Código de barras</Label>
+                                    <Input
+                                        id="codigo_barras"
+                                        placeholder="Ej: 7891234567890"
+                                        value={formData.codigo_barras}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, codigo_barras: e.target.value }))}
+                                    />
+                                </div>
+                            </div>
 
-      {filteredProducts.length === 0 && (
-        <div className="text-center py-12">
-          <Package className="mx-auto h-12 w-12 text-muted-foreground" />
-          <h3 className="mt-2 text-sm font-semibold text-foreground">No hay productos</h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {searchTerm || filterCategory !== "all" || filterStock !== "all"
-              ? "No se encontraron productos con los filtros aplicados."
-              : "Comienza agregando tu primer producto."}
-          </p>
+                            <div className="space-y-2">
+                                <Label htmlFor="descripcion">Descripción</Label>
+                                <Textarea
+                                    id="descripcion"
+                                    placeholder="Descripción del producto..."
+                                    value={formData.descripcion}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, descripcion: e.target.value }))}
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="categoria">Categoría *</Label>
+                                    <Select value={formData.categoria} onValueChange={(value) => setFormData(prev => ({ ...prev, categoria: value as any }))}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="suplementos">Suplementos</SelectItem>
+                                            <SelectItem value="bebidas">Bebidas</SelectItem>
+                                            <SelectItem value="accesorios">Accesorios</SelectItem>
+                                            <SelectItem value="ropa">Ropa</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="proveedor">Proveedor</Label>
+                                    <Input
+                                        id="proveedor"
+                                        placeholder="Ej: Suplementos Colombia"
+                                        value={formData.proveedor}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, proveedor: e.target.value }))}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="precio_compra">Precio de compra</Label>
+                                    <Input
+                                        id="precio_compra"
+                                        type="number"
+                                        placeholder="35000"
+                                        value={formData.precio_compra}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, precio_compra: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="precio_venta">Precio de venta *</Label>
+                                    <Input
+                                        id="precio_venta"
+                                        type="number"
+                                        placeholder="55000"
+                                        value={formData.precio_venta}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, precio_venta: e.target.value }))}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="stock_actual">Stock actual</Label>
+                                    <Input
+                                        id="stock_actual"
+                                        type="number"
+                                        placeholder="10"
+                                        value={formData.stock_actual}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, stock_actual: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="stock_minimo">Stock mínimo</Label>
+                                    <Input
+                                        id="stock_minimo"
+                                        type="number"
+                                        placeholder="5"
+                                        value={formData.stock_minimo}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, stock_minimo: e.target.value }))}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="fecha_vencimiento">Fecha vencimiento</Label>
+                                    <Input
+                                        id="fecha_vencimiento"
+                                        type="date"
+                                        value={formData.fecha_vencimiento}
+                                        onChange={(e) => setFormData(prev => ({ ...prev, fecha_vencimiento: e.target.value }))}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-2">
+                            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                                Cancelar
+                            </Button>
+                            <Button onClick={handleSubmit} disabled={isSubmitting}>
+                                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                {editingProduct ? "Actualizar" : "Crear"}
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            </div>
+
+            {/* Estadísticas */}
+            {stats && (
+                <div className="grid gap-4 md:grid-cols-4">
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Total Productos</CardTitle>
+                            <Package className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{stats.total_productos}</div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Stock Bajo</CardTitle>
+                            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold text-yellow-600">{lowStockCount}</div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Agotados</CardTitle>
+                            <TrendingDown className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold text-red-600">{outOfStockCount}</div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">Valor Inventario</CardTitle>
+                            <Package className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{formatPrice(stats.valor_inventario)}</div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+            {/* Filtros */}
+            <Card>
+                <CardHeader>
+                    <CardTitle>Filtros</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="flex gap-4">
+                        <div className="flex-1">
+                            <Input
+                                placeholder="Buscar productos..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="max-w-sm"
+                            />
+                        </div>
+                        <Select value={filterCategory} onValueChange={setFilterCategory}>
+                            <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Categoría" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todas las categorías</SelectItem>
+                                <SelectItem value="suplementos">Suplementos</SelectItem>
+                                <SelectItem value="bebidas">Bebidas</SelectItem>
+                                <SelectItem value="accesorios">Accesorios</SelectItem>
+                                <SelectItem value="ropa">Ropa</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Select value={filterStock} onValueChange={setFilterStock}>
+                            <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Estado stock" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">Todos</SelectItem>
+                                <SelectItem value="low">Stock bajo</SelectItem>
+                                <SelectItem value="out">Agotados</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Tabla de productos */}
+            <Card>
+                <CardHeader>
+                    <CardTitle>Productos ({filteredProducts.length})</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    {isLoading ? (
+                        <div className="flex justify-center items-center py-8">
+                            <Loader2 className="h-8 w-8 animate-spin" />
+                        </div>
+                    ) : (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Producto</TableHead>
+                                    <TableHead>Categoría</TableHead>
+                                    <TableHead>Precio Compra</TableHead>
+                                    <TableHead>Precio Venta</TableHead>
+                                    <TableHead>Stock</TableHead>
+                                    <TableHead>Estado</TableHead>
+                                    <TableHead>Proveedor</TableHead>
+                                    <TableHead className="text-right">Acciones</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {filteredProducts.map((product) => {
+                                    const stockStatus = getStockStatus(product)
+                                    return (
+                                        <TableRow key={product.id}>
+                                            <TableCell>
+                                                <div>
+                                                    <div className="font-medium">{product.nombre}</div>
+                                                    {product.codigo_barras && (
+                                                        <div className="text-sm text-muted-foreground">{product.codigo_barras}</div>
+                                                    )}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge variant="outline">{product.categoria}</Badge>
+                                            </TableCell>
+                                            <TableCell>{product.precio_compra ? formatPrice(product.precio_compra) : "-"}</TableCell>
+                                            <TableCell className="font-medium">{formatPrice(product.precio_venta)}</TableCell>
+                                            <TableCell>
+                                                <div className="text-sm">
+                                                    <div>{product.stock_actual || 0} unidades</div>
+                                                    <div className="text-muted-foreground">Min: {product.stock_minimo || 0}</div>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge variant={stockStatus.color as any}>{stockStatus.text}</Badge>
+                                            </TableCell>
+                                            <TableCell>{product.proveedor || "-"}</TableCell>
+                                            <TableCell className="text-right">
+                                                <div className="flex justify-end gap-2">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => openEditDialog(product)}
+                                                    >
+                                                        <Edit className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="text-red-600 hover:text-red-700"
+                                                        onClick={() => handleDeleteProduct(product)}
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    )
+                                })}
+                            </TableBody>
+                        </Table>
+                    )}
+                </CardContent>
+            </Card>
+
+            {filteredProducts.length === 0 && !isLoading && (
+                <div className="text-center py-12">
+                    <Package className="mx-auto h-12 w-12 text-muted-foreground" />
+                    <h3 className="mt-2 text-sm font-semibold text-foreground">No hay productos</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                        {searchTerm || filterCategory !== "all" || filterStock !== "all"
+                            ? "No se encontraron productos con los filtros aplicados."
+                            : "Comienza agregando tu primer producto."}
+                    </p>
+                </div>
+            )}
         </div>
-      )}
-    </div>
-  )
+    )
 }
